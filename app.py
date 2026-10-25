@@ -1,7 +1,8 @@
 import os
-import time
 import secrets
+import time
 from threading import Lock
+
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
@@ -10,159 +11,105 @@ CONTROL_PASSWORD = os.environ.get("CONTROL_PASSWORD", "")
 lock = Lock()
 
 started_at = None
-power = 10
+duration = 12
 request_count = 0
 
-PAGE = r'''
+
+PAGE = r"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>The Daily Edit</title>
 
-<link href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Cinzel:wght@400;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&family=MedievalSharp&display=swap" rel="stylesheet">
 
 <style>
 * {
     box-sizing: border-box;
 }
 
-html, body {
-    margin: 0;
-    padding: 0;
-}
-
 body {
-    background: #fbfaf7;
-    color: #1f2430;
+    margin: 0;
     font-family: Arial, sans-serif;
+    background: #faf9f6;
+    color: #262626;
 }
 
-/* ===== NORMAL WEBSITE ===== */
+/* NORMAL WEBSITE */
 
 header {
-    max-width: 1140px;
+    max-width: 1100px;
     margin: auto;
-    padding: 24px 22px;
+    padding: 25px;
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
-.brand {
-    font-size: 28px;
-    font-weight: 800;
-    letter-spacing: -.5px;
+.logo {
+    font-size: 25px;
+    font-weight: bold;
 }
 
 nav {
-    color: #7a7a7a;
-    font-size: 14px;
+    color: #777;
 }
 
 .hero {
-    background: linear-gradient(180deg, #f3f0e7 0%, #f8f6f2 100%);
-    padding: 100px 24px 90px;
     text-align: center;
-    border-top: 1px solid #eee8dd;
-    border-bottom: 1px solid #eee8dd;
-}
-
-.eyebrow {
-    font-size: 12px;
-    letter-spacing: 3px;
-    color: #8d7759;
-    margin-bottom: 12px;
+    background: #efede7;
+    padding: 110px 20px;
 }
 
 .hero h1 {
-    margin: 0 auto 14px;
+    font-size: clamp(38px, 7vw, 75px);
     max-width: 800px;
-    font-size: clamp(38px, 7vw, 74px);
-    line-height: 1.02;
-    letter-spacing: -2px;
+    margin: 15px auto;
 }
 
 .hero p {
-    margin: 0 auto;
-    max-width: 640px;
+    color: #777;
     font-size: 18px;
-    line-height: 1.7;
-    color: #6f7378;
 }
 
 main {
-    max-width: 1140px;
-    margin: 70px auto;
-    padding: 0 22px;
-}
-
-.section-title {
-    margin: 0 0 22px;
-    font-size: 30px;
+    max-width: 1100px;
+    margin: 65px auto;
+    padding: 20px;
 }
 
 .cards {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 22px;
+    gap: 20px;
 }
 
-.card {
+article {
     background: white;
-    border: 1px solid #ececec;
-    border-radius: 18px;
-    overflow: hidden;
-    box-shadow: 0 8px 24px rgba(0,0,0,.04);
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 6px 25px #0000000c;
 }
 
-.card-art {
-    height: 140px;
-    background: linear-gradient(135deg, #e7dfd0, #f2eee8);
-}
-
-.card:nth-child(2) .card-art {
-    background: linear-gradient(135deg, #dae4ea, #eef3f6);
-}
-
-.card:nth-child(3) .card-art {
-    background: linear-gradient(135deg, #ead8d8, #f7efef);
-}
-
-.card-body {
-    padding: 20px;
-}
-
-.card h3 {
-    margin: 0 0 10px;
-    font-size: 22px;
-}
-
-.card p {
-    margin: 0;
-    color: #70757c;
-    line-height: 1.7;
+article p {
+    color: #777;
+    line-height: 1.6;
 }
 
 footer {
-    max-width: 1140px;
-    margin: 70px auto 0;
-    padding: 26px 22px 34px;
-    border-top: 1px solid #ececec;
-    color: #9a9a9a;
-    font-size: 12px;
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
+    text-align: center;
+    color: #999;
+    padding: 25px;
 }
 
-#request-meter {
-    opacity: .75;
-    font-size: 11px;
+.normal-counter {
+    font-size: 10px;
+    margin-top: 10px;
 }
 
-/* ===== HORROR OVERLAY ===== */
+/* HORROR WORLD */
 
 #horror {
     display: none;
@@ -170,425 +117,396 @@ footer {
     inset: 0;
     z-index: 9999;
     overflow: hidden;
-    color: #fff;
+
     background:
-        radial-gradient(circle at center, rgba(88,0,12,.22) 0%, rgba(17,0,4,.76) 38%, rgba(0,0,0,.96) 100%),
-        linear-gradient(180deg, #160003 0%, #050001 100%);
+        radial-gradient(
+            ellipse at center,
+            #4b000c 0%,
+            #1b0005 45%,
+            #020001 100%
+        );
+
+    color: white;
 }
 
-#horror.on {
+#horror.active {
     display: block;
 }
 
-/* ===== MOVING FOG ===== */
+/* DARK VIGNETTE */
 
-.fog,
-.fog2 {
+#horror::after {
+    content: "";
     position: absolute;
-    inset: -10%;
-    background:
-        radial-gradient(circle at 20% 35%, rgba(110,0,16,.08), transparent 28%),
-        radial-gradient(circle at 75% 25%, rgba(150,150,150,.035), transparent 25%),
-        radial-gradient(circle at 50% 80%, rgba(110,0,20,.06), transparent 28%);
-    filter: blur(30px);
-    animation: drift 18s linear infinite;
+    inset: 0;
     pointer-events: none;
+    z-index: 7;
+    box-shadow: inset 0 0 150px 65px #000b;
 }
 
-.fog2 {
-    animation-duration: 28s;
-    animation-direction: reverse;
-    opacity: .8;
-}
-
-@keyframes drift {
-    0%   { transform: translate3d(-2%, -1%, 0) scale(1.03); }
-    50%  { transform: translate3d(2%, 2%, 0) scale(1.08); }
-    100% { transform: translate3d(-2%, -1%, 0) scale(1.03); }
-}
-
-/* ===== BLOOD BAR ===== */
+/* BLOOD CEILING */
 
 .blood-top {
     position: absolute;
-    inset: 0 0 auto 0;
-    height: 84px;
-    background:
-        linear-gradient(180deg, #c10c20 0%, #8e0212 30%, #5b000b 68%, #2c0005 100%);
-    box-shadow:
-        0 10px 40px rgba(80,0,0,.82),
-        inset 0 -14px 18px rgba(0,0,0,.32);
-    z-index: 5;
-}
-
-.blood-top::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: 24px;
-    background: linear-gradient(180deg, rgba(255,180,180,.2), rgba(255,255,255,0));
-    mix-blend-mode: screen;
-    pointer-events: none;
-}
-
-.blood-top::after {
-    content: "";
-    position: absolute;
+    top: 0;
     left: 0;
-    bottom: -16px;
-    width: 100%;
-    height: 34px;
-    background:
-        radial-gradient(circle at 5% 0,  #7c000b 0 18px, transparent 19px),
-        radial-gradient(circle at 13% 0, #950010 0 24px, transparent 25px),
-        radial-gradient(circle at 24% 0, #85000d 0 14px, transparent 15px),
-        radial-gradient(circle at 37% 0, #9a0011 0 28px, transparent 29px),
-        radial-gradient(circle at 51% 0, #6b000a 0 17px, transparent 18px),
-        radial-gradient(circle at 66% 0, #a00012 0 24px, transparent 25px),
-        radial-gradient(circle at 80% 0, #78000b 0 16px, transparent 17px),
-        radial-gradient(circle at 92% 0, #91000f 0 21px, transparent 22px);
-    opacity: .96;
-}
+    right: 0;
+    height: 75px;
+    z-index: 6;
 
-/* ===== BLOOD DRIPS ===== */
+    background: linear-gradient(
+        180deg,
+        #d01329,
+        #990015 35%,
+        #560008 100%
+    );
+
+    box-shadow:
+        0 12px 40px #570006,
+        inset 0 7px 15px #ff757533;
+}
 
 .drip {
     position: absolute;
-    top: 70px;
+    top: 65px;
     width: 28px;
-    border-radius: 0 0 18px 18px;
-    background:
-        linear-gradient(180deg, #690007 0%, #a70014 32%, #8a0010 72%, #430006 100%);
-    box-shadow:
-        inset -4px 0 6px rgba(0,0,0,.28),
-        inset 3px 0 5px rgba(255,145,145,.12),
-        0 0 16px rgba(120,0,0,.24);
-    transform-origin: top center;
-    animation: ooze 7s ease-in-out infinite;
-    z-index: 5;
-}
+    border-radius: 0 0 55% 55%;
 
-.drip::before {
-    content: "";
-    position: absolute;
-    top: -8px;
-    left: 3px;
-    width: 22px;
-    height: 18px;
-    border-radius: 50%;
-    background: #8c000d;
+    background: linear-gradient(
+        90deg,
+        #470003,
+        #a90017,
+        #ce1029,
+        #650009
+    );
+
+    box-shadow:
+        inset 4px 0 6px #ff85852e,
+        inset -4px 0 8px #0008;
+
+    transform-origin: top;
+    animation: dripMove 7s ease-in-out infinite;
 }
 
 .drip::after {
     content: "";
     position: absolute;
-    bottom: -14px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 34px;
-    height: 30px;
-    border-radius: 50% 50% 58% 58%;
+    width: 120%;
+    height: 28px;
+    left: -10%;
+    bottom: -13px;
+    border-radius: 50%;
+
     background:
-        radial-gradient(circle at 30% 25%, rgba(255,180,180,.22), transparent 28%),
-        radial-gradient(circle at 50% 60%, #b50b17 0%, #83000d 60%, #4e0006 100%);
-    box-shadow: 0 3px 10px rgba(0,0,0,.28);
+        radial-gradient(
+            circle at 30% 25%,
+            #ffaaaa55,
+            transparent 35%
+        ),
+        linear-gradient(#bd071e, #550006);
 }
 
-.d1 { left: 6%;  height: 88px;  width: 24px; animation-delay: 0s;   }
-.d2 { left: 15%; height: 130px; width: 22px; animation-delay: .9s;  }
-.d3 { left: 28%; height: 74px;  width: 20px; animation-delay: 1.6s; }
-.d4 { left: 39%; height: 146px; width: 34px; animation-delay: .3s;  }
-.d5 { left: 51%; height: 98px;  width: 25px; animation-delay: 2s;   }
-.d6 { left: 64%; height: 136px; width: 28px; animation-delay: .8s;  }
-.d7 { left: 77%; height: 82px;  width: 22px; animation-delay: 1.1s; }
-.d8 { left: 89%; height: 118px; width: 30px; animation-delay: .4s;  }
+.d1 {left:5%; height:100px; animation-delay:-1s;}
+.d2 {left:15%; height:140px; animation-delay:-3s;}
+.d3 {left:27%; height:75px; animation-delay:-2s;}
+.d4 {left:40%; height:160px; animation-delay:-4s;}
+.d5 {left:53%; height:105px; animation-delay:-.5s;}
+.d6 {left:65%; height:135px; animation-delay:-3.5s;}
+.d7 {left:79%; height:85px; animation-delay:-2.3s;}
+.d8 {left:90%; height:120px; animation-delay:-1.7s;}
 
-@keyframes ooze {
-    0%   { transform: scaleY(.92); filter: brightness(.92); }
-    25%  { transform: scaleY(1.00); filter: brightness(1.02); }
-    50%  { transform: scaleY(1.10); filter: brightness(1.05); }
-    75%  { transform: scaleY(1.00); filter: brightness(.97); }
-    100% { transform: scaleY(.92); filter: brightness(.92); }
-}
+@keyframes dripMove {
+    0%,100% {
+        transform: scaleY(.88);
+    }
 
-/* ===== BLOOD STREAMS ===== */
-
-.blood-run {
-    position: absolute;
-    top: -100%;
-    width: 5px;
-    height: 130vh;
-    background: linear-gradient(180deg, rgba(130,0,10,.9), rgba(130,0,10,.18), transparent 85%);
-    opacity: .26;
-    filter: blur(1px);
-    animation: runDown 8.5s linear infinite;
-    z-index: 1;
-}
-
-.r1 { left: 10%; animation-delay: 0s; }
-.r2 { left: 30%; animation-delay: 2s; }
-.r3 { left: 57%; animation-delay: 1s; }
-.r4 { left: 83%; animation-delay: 3.3s; }
-
-@keyframes runDown {
-    0%   { transform: translateY(-100%); opacity: 0; }
-    15%  { opacity: .22; }
-    65%  { opacity: .32; }
-    100% { transform: translateY(100%); opacity: 0; }
-}
-
-/* ===== BLOOD SPLATTERS ===== */
-
-.splatter {
-    position: absolute;
-    width: 260px;
-    height: 260px;
-    opacity: .9;
-    pointer-events: none;
-    background:
-        radial-gradient(circle at 50% 50%, #a40015 0 20%, transparent 21%),
-        radial-gradient(circle at 24% 28%, #8b0010 0 8%, transparent 9%),
-        radial-gradient(circle at 76% 18%, #c10f21 0 7%, transparent 8%),
-        radial-gradient(circle at 84% 69%, #87000f 0 10%, transparent 11%),
-        radial-gradient(circle at 13% 77%, #700009 0 7%, transparent 8%),
-        radial-gradient(circle at 56% 8%, #c90d1e 0 4%, transparent 5%),
-        radial-gradient(circle at 90% 44%, #8b0010 0 5%, transparent 6%);
-    filter: blur(.25px);
-}
-
-.s1 { top: 16%; left: -60px; transform: rotate(18deg) scale(1.25); }
-.s2 { top: 34%; right: -70px; transform: rotate(-28deg) scale(1.35); }
-.s3 { bottom: -50px; left: 4%; transform: rotate(50deg) scale(1.0); }
-.s4 { bottom: -60px; right: 7%; transform: rotate(-46deg) scale(1.15); }
-
-/* ===== CONTENT ===== */
-
-.horror-content {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    text-align: center;
-    padding: 150px 20px 110px;
-    z-index: 4;
-}
-
-.center-stack {
-    max-width: 920px;
-    position: relative;
-    z-index: 6;
-}
-
-#warning {
-    font-family: 'MedievalSharp', 'Cinzel', serif;
-    font-size: clamp(42px, 8vw, 94px);
-    line-height: 1.12;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: #ed1d32;
-    min-height: 1.3em;
-    text-shadow:
-        0 0 8px #ff364a,
-        0 0 22px #a40014,
-        0 0 55px rgba(110,0,0,.95);
-}
-
-#subtext {
-    margin-top: 14px;
-    font-family: 'Cinzel', serif;
-    font-size: clamp(15px, 2.4vw, 24px);
-    letter-spacing: 4px;
-    color: #efc2c8;
-    min-height: 2em;
-    text-shadow: 0 0 14px rgba(110,0,10,.55);
-}
-
-/* ===== MONSTERS ===== */
-
-.monster-layer {
-    position: absolute;
-    inset: 0;
-    z-index: 3;
-    pointer-events: none;
-}
-
-.monster {
-    position: absolute;
-    opacity: .94;
-    filter:
-        brightness(.9)
-        contrast(1.2)
-        saturate(.7)
-        drop-shadow(0 0 16px rgba(255,10,40,.12))
-        drop-shadow(0 0 38px rgba(100,0,0,.45));
-    animation: pulseShadow 6s ease-in-out infinite;
-    user-select: none;
-}
-
-@keyframes pulseShadow {
-    0%, 100% { transform-origin: center; }
-    50% { filter:
-        brightness(.96)
-        contrast(1.25)
-        saturate(.72)
-        drop-shadow(0 0 18px rgba(255,15,50,.16))
-        drop-shadow(0 0 45px rgba(120,0,0,.52));
+    50% {
+        transform: scaleY(1.12);
     }
 }
 
-/* One huge behind text */
+/* BLOOD STREAMS */
+
+.stream {
+    position: absolute;
+    width: 5px;
+    height: 90vh;
+    top: -100%;
+    z-index: 1;
+    opacity: .35;
+
+    background: linear-gradient(
+        #a40016,
+        #65000799,
+        transparent
+    );
+
+    animation: flowDown 9s linear infinite;
+}
+
+.stream:nth-child(1) {
+    left: 12%;
+}
+
+.stream:nth-child(2) {
+    left: 34%;
+    animation-delay: -3s;
+}
+
+.stream:nth-child(3) {
+    left: 62%;
+    animation-delay: -5s;
+}
+
+.stream:nth-child(4) {
+    left: 85%;
+    animation-delay: -2s;
+}
+
+@keyframes flowDown {
+    to {
+        transform: translateY(230vh);
+    }
+}
+
+/* RED FOG */
+
+.fog {
+    position: absolute;
+    inset: -20%;
+    z-index: 1;
+    pointer-events: none;
+
+    background:
+        radial-gradient(
+            ellipse at 30% 50%,
+            #b9001724,
+            transparent 45%
+        ),
+        radial-gradient(
+            ellipse at 70% 60%,
+            #91001c24,
+            transparent 48%
+        );
+
+    filter: blur(40px);
+    animation: fogMove 15s ease-in-out infinite alternate;
+}
+
+@keyframes fogMove {
+    from {
+        transform: translateX(-5%);
+    }
+
+    to {
+        transform: translateX(5%);
+    }
+}
+
+/* FIVE MONSTERS */
+
+.monster {
+    position: absolute;
+    z-index: 2;
+    pointer-events: none;
+    object-fit: contain;
+    max-height: 60vh;
+
+    filter:
+        brightness(.82)
+        contrast(1.35)
+        drop-shadow(0 0 25px #a5002466);
+}
+
+/* HUGE MONSTER BEHIND TEXT */
+
 .m1 {
-    width: min(34vw, 310px);
+    width: 32vw;
+    max-width: 320px;
     left: 50%;
     top: 18%;
-    transform: translateX(-50%) scale(1.2);
-    opacity: .28;
+
+    transform: translateX(-50%) scale(1.25);
+    opacity: .23;
 }
 
-/* Upside down from top */
+/* UPSIDE DOWN */
+
 .m2 {
-    width: min(20vw, 180px);
-    left: 14%;
-    top: -12px;
+    width: 20vw;
+    max-width: 190px;
+    left: 12%;
+    top: -30px;
+
     transform: rotate(180deg);
-    opacity: .92;
 }
 
-/* Left side creeping in */
+/* LEFT SIDE */
+
 .m3 {
-    width: min(18vw, 170px);
-    left: -18px;
+    width: 19vw;
+    max-width: 180px;
+    left: -35px;
     top: 43%;
-    transform: rotate(-24deg);
+
+    transform: rotate(-30deg);
 }
 
-/* Right side leaning in */
+/* RIGHT SIDE */
+
 .m4 {
-    width: min(17vw, 160px);
-    right: -8px;
-    top: 34%;
-    transform: rotate(18deg) scaleX(-1);
+    width: 19vw;
+    max-width: 180px;
+    right: -25px;
+    top: 38%;
+
+    transform: rotate(30deg) scaleX(-1);
 }
 
-/* Bottom partially hidden */
+/* BOTTOM MONSTER */
+
 .m5 {
-    width: min(24vw, 220px);
-    left: 62%;
-    bottom: -26px;
-    transform: translateX(-50%) rotate(-8deg);
-    opacity: .88;
+    width: 25vw;
+    max-width: 240px;
+    right: 20%;
+    bottom: -75px;
+
+    transform: rotate(-15deg);
 }
 
-.counter-chip {
+/* HORROR TEXT */
+
+.message {
     position: absolute;
-    right: 18px;
-    bottom: 16px;
-    z-index: 7;
-    font-size: 11px;
-    color: #c38a92;
-    background: rgba(20,0,5,.45);
-    border: 1px solid rgba(132,16,29,.55);
-    border-radius: 10px;
-    padding: 8px 10px;
-    backdrop-filter: blur(4px);
+    z-index: 5;
+    inset: 0;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+
+    padding: 150px 16px 90px;
+    text-align: center;
 }
 
-.counter-chip b {
-    color: #ff707c;
-    font-variant-numeric: tabular-nums;
+#warning {
+    font-family: "UnifrakturCook", "MedievalSharp", serif;
+    font-size: clamp(43px, 8vw, 100px);
+    color: #ff1e3b;
+    line-height: 1.17;
+    max-width: 1000px;
+    min-height: 1.3em;
+
+    text-shadow:
+        0 0 10px #fa153e,
+        0 0 30px #be0018,
+        0 0 65px #5e0009;
 }
 
-@media (max-width: 900px) {
+#subtext {
+    font-family: "MedievalSharp", serif;
+    font-size: clamp(15px, 2.7vw, 28px);
+    letter-spacing: 3px;
+    color: #e3a3ab;
+    margin-top: 30px;
+    min-height: 2em;
+
+    text-shadow: 0 0 18px #a60021;
+}
+
+.tiny-counter {
+    position: absolute;
+    bottom: 12px;
+    right: 16px;
+    z-index: 10;
+
+    font-size: 10px;
+    color: #c18a92;
+    opacity: .75;
+}
+
+@media(max-width:700px) {
     .cards {
         grid-template-columns: 1fr;
     }
 
-    .m1 { width: 42vw; top: 20%; }
-    .m2 { width: 24vw; left: 6%; }
-    .m3 { width: 22vw; }
-    .m4 { width: 21vw; }
-    .m5 { width: 28vw; left: 66%; }
+    .m1 {
+        width: 48vw;
+    }
 
-    .horror-content {
-        padding-top: 170px;
+    .m2 {
+        width: 29vw;
+        left: 5%;
+    }
+
+    .m3 {
+        width: 27vw;
+    }
+
+    .m4 {
+        width: 27vw;
+    }
+
+    .m5 {
+        width: 35vw;
+    }
+
+    .message {
+        padding-top: 165px;
     }
 }
 
-@media (max-width: 600px) {
-    .hero {
-        padding: 80px 20px;
-    }
-
-    #warning {
-        letter-spacing: 2px;
-    }
-
-    .m1 { width: 50vw; opacity: .24; }
-    .m2 { width: 28vw; top: 18px; }
-    .m3 { width: 25vw; top: 49%; }
-    .m4 { width: 25vw; top: 40%; }
-    .m5 { width: 33vw; left: 68%; }
-
-    .counter-chip {
-        font-size: 10px;
-        right: 12px;
-        bottom: 12px;
+@media(prefers-reduced-motion:reduce) {
+    .drip, .stream, .fog {
+        animation: none;
     }
 }
 </style>
 </head>
+
 <body>
 
 <header>
-    <div class="brand">The Daily Edit.</div>
-    <nav>Stories &nbsp;&nbsp; About</nav>
+    <div class="logo">The Daily Edit.</div>
+    <nav>Home &nbsp; Stories &nbsp; About</nav>
 </header>
 
 <section class="hero">
-    <div class="eyebrow">THOUGHTS · CULTURE · EVERYDAY LIFE</div>
     <h1>A little inspiration for every day.</h1>
-    <p>
-        Fresh perspectives on the things that matter. Discover thoughtful
-        stories, simple ideas, and quiet inspiration for daily life.
-    </p>
+    <p>Fresh perspectives on the things that matter.</p>
 </section>
 
 <main>
-    <h2 class="section-title">Featured stories</h2>
+    <h2>Featured Stories</h2>
 
     <div class="cards">
-        <div class="card">
-            <div class="card-art"></div>
-            <div class="card-body">
-                <h3>Small things, big changes</h3>
-                <p>Why the smallest habits often make the biggest difference over time.</p>
-            </div>
-        </div>
+        <article>
+            <h3>Small Things, Big Changes</h3>
+            <p>Discover simple habits for everyday life.</p>
+        </article>
 
-        <div class="card">
-            <div class="card-art"></div>
-            <div class="card-body">
-                <h3>Living with technology</h3>
-                <p>Finding a better balance in a world that always wants your attention.</p>
-            </div>
-        </div>
+        <article>
+            <h3>Living With Technology</h3>
+            <p>Finding balance in a connected world.</p>
+        </article>
 
-        <div class="card">
-            <div class="card-art"></div>
-            <div class="card-body">
-                <h3>Making room for creativity</h3>
-                <p>Simple ways to invite more imagination into your ordinary routine.</p>
-            </div>
-        </div>
+        <article>
+            <h3>Making Room for Creativity</h3>
+            <p>Find inspiration in ordinary moments.</p>
+        </article>
     </div>
 </main>
 
 <footer>
-    <span>© The Daily Edit</span>
-    <span id="request-meter">Requests served: <span id="actual">0</span></span>
+    © The Daily Edit
+    <div class="normal-counter">
+        Requests served: <span id="actual">0</span>
+    </div>
 </footer>
 
 <div id="horror">
+
     <div class="blood-top">
         <i class="drip d1"></i>
         <i class="drip d2"></i>
@@ -600,172 +518,202 @@ footer {
         <i class="drip d8"></i>
     </div>
 
-    <div class="blood-run r1"></div>
-    <div class="blood-run r2"></div>
-    <div class="blood-run r3"></div>
-    <div class="blood-run r4"></div>
-
-    <div class="splatter s1"></div>
-    <div class="splatter s2"></div>
-    <div class="splatter s3"></div>
-    <div class="splatter s4"></div>
+    <div>
+        <div class="stream"></div>
+        <div class="stream"></div>
+        <div class="stream"></div>
+        <div class="stream"></div>
+    </div>
 
     <div class="fog"></div>
-    <div class="fog2"></div>
 
-    <div class="monster-layer">
-        <img class="monster m1" src="/static/monster.png" alt="monster">
-        <img class="monster m2" src="/static/monster.png" alt="monster">
-        <img class="monster m3" src="/static/monster.png" alt="monster">
-        <img class="monster m4" src="/static/monster.png" alt="monster">
-        <img class="monster m5" src="/static/monster.png" alt="monster">
+    <img class="monster m1"
+         src="/static/creepy-removebg-preview" alt="">
+
+    <img class="monster m2"
+         src="/static/creepy-removebg-preview" alt="">
+
+    <img class="monster m3"
+         src="/static/creepy-removebg-preview" alt="">
+
+    <img class="monster m4"
+         src="/static/creepy-removebg-preview" alt="">
+
+    <img class="monster m5"
+         src="/static/creepy-removebg-preview" alt="">
+
+    <div class="message">
+        <div id="warning"></div>
+        <div id="subtext"></div>
     </div>
 
-    <div class="horror-content">
-        <div class="center-stack">
-            <div id="warning"></div>
-            <div id="subtext"></div>
-        </div>
+    <div class="tiny-counter">
+        Requests served: <span id="hActual">0</span>
     </div>
 
-    <div class="counter-chip">
-        Requests served: <b id="hActual">0</b><br>
-        Visual load: <b id="hDemo">0</b>
-    </div>
 </div>
 
 <script>
 let active = false;
-let failed = 0;
-let redirected = false;
 let timers = [];
 
 function typeLine(id, text, speed, delay) {
     const element = document.getElementById(id);
-    element.textContent = '';
 
-    for (let n = 1; n <= text.length; n++) {
+    element.textContent = "";
+
+    for (let i = 1; i <= text.length; i++) {
         timers.push(setTimeout(() => {
-            element.textContent = text.slice(0, n);
-        }, delay + n * speed));
+            element.textContent = text.slice(0, i);
+        }, delay + i * speed));
     }
 }
 
-function horrorOn() {
+function startHorror() {
     if (active) return;
-    active = true;
-    document.getElementById('horror').classList.add('on');
 
-    typeLine('warning', "YOU SHOULD NOT HAVE COME HERE", 175, 0);
-    typeLine('subtext', "IT SEES YOU. IT KNOWS YOU ARE HERE.", 110, 6200);
+    active = true;
+
+    document.getElementById("horror")
+        .classList.add("active");
+
+    typeLine(
+        "warning",
+        "YOU SHOULD NOT HAVE COME HERE",
+        140,
+        0
+    );
+
+    typeLine(
+        "subtext",
+        "IT SEES YOU. IT KNOWS YOU ARE HERE.",
+        80,
+        4500
+    );
 }
 
-function horrorOff() {
+function stopHorror() {
     if (!active) return;
+
     active = false;
+
     timers.forEach(clearTimeout);
     timers = [];
-    document.getElementById('horror').classList.remove('on');
+
+    document.getElementById("horror")
+        .classList.remove("active");
 }
 
 async function poll() {
-    if (redirected) return;
-
     try {
-        const response = await fetch('/api/status?t=' + Date.now(), { cache: 'no-store' });
+        const response = await fetch(
+            "/api/status?t=" + Date.now(),
+            {cache:"no-store"}
+        );
 
-        if (!response.ok) {
-            throw new Error('HTTP ' + response.status);
-        }
+        if (!response.ok) return;
 
         const data = await response.json();
-        failed = 0;
 
-        document.getElementById('actual').textContent = data.actual.toLocaleString();
-        document.getElementById('hActual').textContent = data.actual.toLocaleString();
-        document.getElementById('hDemo').textContent = data.visual.toLocaleString();
+        document.getElementById("actual")
+            .textContent = data.actual.toLocaleString();
 
-        if (data.phase === 'running') {
-            horrorOn();
+        document.getElementById("hActual")
+            .textContent = data.actual.toLocaleString();
+
+        if (data.phase === "running" ||
+            data.phase === "complete") {
+            startHorror();
         } else {
-            horrorOff();
+            stopHorror();
         }
-
     } catch (error) {
-        failed++;
-        if (failed >= 3) {
-            redirected = true;
-        }
+        // The browser may remain on the last loaded page
+        // if the hosting service becomes unavailable.
     }
 }
 
-setInterval(poll, 900);
+setInterval(poll, 1000);
 poll();
 </script>
 
 </body>
 </html>
-'''
+"""
+
 
 def current_state():
     with lock:
         start = started_at
-        selected = power
+        selected = duration
         actual = request_count
 
     if start is None:
-        return "online", 0, actual
+        return "online", actual
 
     elapsed = time.monotonic() - start
-    step = min(selected, int(elapsed) + 1)
-
-    visual = (2 ** step - 1) if selected == 10 else (2 ** step)
     phase = "complete" if elapsed >= selected else "running"
 
-    return phase, visual, actual
+    return phase, actual
+
 
 def authorized():
     entered = request.headers.get("X-Control-Key", "")
-    return bool(CONTROL_PASSWORD) and secrets.compare_digest(entered, CONTROL_PASSWORD)
+
+    return (
+        bool(CONTROL_PASSWORD)
+        and secrets.compare_digest(entered, CONTROL_PASSWORD)
+    )
+
 
 @app.before_request
-def count_http_request():
+def count_request():
     global request_count
+
     with lock:
         request_count += 1
 
+
 @app.after_request
-def no_cache(response):
+def prevent_cache(response):
     response.headers["Cache-Control"] = "no-store"
     return response
 
+
 @app.get("/")
 def home():
-    return PAGE, 200
+    return PAGE
+
 
 @app.get("/api/status")
 def status():
-    phase, visual, actual = current_state()
-    return jsonify(phase=phase, visual=visual, actual=actual), 200
+    phase, actual = current_state()
+
+    return jsonify(
+        phase=phase,
+        actual=actual
+    )
+
 
 @app.post("/api/start")
 def start():
-    global started_at, power
+    global started_at, duration
 
     if not authorized():
         return jsonify(error="Unauthorized"), 401
 
     data = request.get_json(silent=True) or {}
-    selected = data.get("rounds")
+    seconds = data.get("seconds")
 
-    if type(selected) is not int or selected not in (10, 12):
-        return jsonify(error="Select Power 10 or 12"), 400
+    if type(seconds) is not int or seconds not in (10, 12):
+        return jsonify(error="Invalid duration"), 400
 
     with lock:
-        power = selected
+        duration = seconds
         started_at = time.monotonic()
 
-    return jsonify(message="Started", power=selected)
+    return jsonify(message="Started")
+
 
 @app.post("/api/reset")
 def reset():
@@ -777,7 +725,8 @@ def reset():
     with lock:
         started_at = None
 
-    return jsonify(message="Restored")
+    return jsonify(message="Reset")
+
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5050)
