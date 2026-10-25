@@ -1,9 +1,8 @@
 import os
 import time
 import secrets
-from pathlib import Path
 from threading import Lock
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
@@ -11,38 +10,18 @@ CONTROL_PASSWORD = os.getenv("CONTROL_PASSWORD", "")
 lock = Lock()
 
 started_at = None
-duration = 18
+power = 10
+step_seconds = 1.0
 request_count = 0
 
-IMAGE_NAMES = [
-    "creepy-removebg-preview.png"
-]
-
-
-@app.get("/monster")
-def monster_image():
-    folder = Path(app.root_path) / "static"
-
-    for name in IMAGE_NAMES:
-        file = folder / name
-        if file.is_file():
-            return send_file(file)
-
-    # Fallback: find another image automatically
-    if folder.exists():
-        for file in sorted(folder.iterdir()):
-            if file.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp"):
-                return send_file(file)
-
-    return "Monster image missing from static folder", 404
-
+IMAGE = "/static/creepy-removebg-preview.png"
 
 PAGE = r"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Daily Edit</title>
 
 <link href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&family=MedievalSharp&display=swap" rel="stylesheet">
@@ -53,35 +32,38 @@ PAGE = r"""
 body {
     margin: 0;
     background: #f7f5f0;
-    color: #222;
+    color: #262626;
     font-family: Arial, sans-serif;
 }
 
+/* NORMAL WEBSITE */
+
 header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     max-width: 1100px;
     margin: auto;
     padding: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
 .logo {
-    font-size: 25px;
-    font-weight: 800;
+    font-size: 26px;
+    font-weight: bold;
 }
 
-nav { color: #888; }
+nav { color: #777; }
 
 .hero {
+    background: #eeeae2;
     padding: 110px 20px;
-    background: #ebe8e0;
     text-align: center;
 }
 
 .hero h1 {
-    font-size: clamp(36px, 7vw, 70px);
-    margin: 0 0 20px;
+    font-size: clamp(36px, 7vw, 75px);
+    margin: 0 auto 20px;
+    max-width: 800px;
 }
 
 .hero p {
@@ -91,8 +73,8 @@ nav { color: #888; }
 
 main {
     max-width: 1100px;
-    margin: 70px auto;
     padding: 20px;
+    margin: 60px auto;
 }
 
 .cards {
@@ -102,10 +84,10 @@ main {
 }
 
 article {
-    border-radius: 16px;
-    background: white;
     padding: 30px;
-    box-shadow: 0 4px 25px #0000000d;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 5px 25px #00000010;
 }
 
 article p {
@@ -114,28 +96,33 @@ article p {
 }
 
 footer {
+    padding: 35px 20px;
     text-align: center;
     color: #999;
-    padding: 40px;
+    font-size: 12px;
 }
 
-#normalCount {
-    font-size: 10px;
+.normal-counter {
     margin-top: 12px;
+    font-size: 10px;
 }
 
-/* HORROR SCREEN */
+/* HORROR BACKGROUND */
 
 #horror {
+    display: none;
     position: fixed;
     inset: 0;
     z-index: 9999;
-    display: none;
     overflow: hidden;
-    color: white;
     background:
-      radial-gradient(ellipse at center,
-        #55000e 0%, #170004 45%, #020001 100%);
+        radial-gradient(
+            ellipse at center,
+            #51000b 0%,
+            #190005 45%,
+            #020001 100%
+        );
+    color: white;
 }
 
 #horror.active { display: block; }
@@ -144,70 +131,84 @@ footer {
     content: "";
     position: absolute;
     inset: 0;
-    z-index: 4;
+    z-index: 5;
     pointer-events: none;
-    box-shadow: inset 0 0 170px 50px #000c;
+    box-shadow: inset 0 0 155px 45px #000a;
 }
 
-/* WET BLOOD */
+/* THICK BLOOD CEILING */
 
 .blood-top {
     position: absolute;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 75px;
+    right: 0;
+    height: 80px;
     z-index: 8;
+
     background: linear-gradient(
-        #cf1029,
-        #980015 40%,
-        #4c0007
+        180deg,
+        #db142c,
+        #940012 40%,
+        #490005
     );
+
     box-shadow:
-        0 10px 35px #640007,
-        inset 0 8px 14px #ffb2b23b;
+        0 10px 35px #76000b,
+        inset 0 8px 14px #ffa3a344;
 }
 
 .blood-top::before {
     content: "";
     position: absolute;
-    inset: 0 0 auto;
-    height: 16px;
-    background: linear-gradient(#ffffff26, transparent);
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background: linear-gradient(
+        #ffffff27,
+        transparent
+    );
 }
+
+/* DRIPPING BLOOD */
 
 .drip {
     position: absolute;
-    top: 65px;
+    top: 69px;
     width: 28px;
     border-radius: 0 0 50% 50%;
-    transform-origin: top;
+
     background: linear-gradient(
         90deg,
-        #3f0005,
+        #400005,
         #a00013 30%,
-        #d00923 60%,
-        #610007
+        #d30d25 60%,
+        #600008
     );
+
     box-shadow:
         inset 3px 0 6px #ffb4b433,
-        inset -4px 0 9px #0009;
+        inset -4px 0 8px #0008;
+
+    transform-origin: top;
     animation: ooze 7s ease-in-out infinite;
 }
 
 .drip::after {
     content: "";
     position: absolute;
+    bottom: -15px;
+    left: -12%;
     width: 125%;
     height: 30px;
-    bottom: -14px;
-    left: -12%;
     border-radius: 50%;
+
     background: radial-gradient(
         circle at 33% 25%,
-        #ff8c8c77,
-        #b50019 35%,
-        #520006 100%
+        #ff9f9f66,
+        #b40018 35%,
+        #490005
     );
 }
 
@@ -221,39 +222,52 @@ footer {
 .d8 { left: 91%; height: 125px; animation-delay: -1.5s; }
 
 @keyframes ooze {
-    0%, 100% { transform: scaleY(.87); }
-    50% { transform: scaleY(1.13); }
+    0%, 100% { transform: scaleY(.88); }
+    50% { transform: scaleY(1.12); }
 }
 
-/* MOVING SHADOWS */
+/* BLOOD FOG */
 
 .fog {
     position: absolute;
     inset: -20%;
+    z-index: 1;
+    pointer-events: none;
+
     background:
-      radial-gradient(ellipse at 30% 50%, #bd001a38, transparent 50%),
-      radial-gradient(ellipse at 70% 70%, #8a001438, transparent 50%);
+        radial-gradient(
+            ellipse at 30% 50%,
+            #b900173b,
+            transparent 50%
+        ),
+        radial-gradient(
+            ellipse at 70% 65%,
+            #8e001939,
+            transparent 50%
+        );
+
     filter: blur(55px);
-    animation: fogMove 12s ease-in-out infinite alternate;
+    animation: fogMove 14s ease-in-out infinite alternate;
 }
 
 @keyframes fogMove {
-    from { transform: translateX(-5%); }
-    to { transform: translateX(5%); }
+    from { transform: translateX(-6%); }
+    to { transform: translateX(6%); }
 }
 
-/* MONSTERS */
+/* FIVE MONSTERS */
 
 .monster {
     position: absolute;
     z-index: 2;
-    object-fit: contain;
     pointer-events: none;
+    object-fit: contain;
     max-height: 65vh;
+
     filter:
-      brightness(.82)
-      contrast(1.4)
-      drop-shadow(0 0 28px #bd001d88);
+        brightness(.85)
+        contrast(1.4)
+        drop-shadow(0 0 25px #b4002388);
 }
 
 .m1 {
@@ -261,8 +275,8 @@ footer {
     max-width: 330px;
     left: 50%;
     top: 16%;
+    opacity: .27;
     transform: translateX(-50%) scale(1.3);
-    opacity: .28;
 }
 
 .m2 {
@@ -297,69 +311,70 @@ footer {
     transform: rotate(-15deg);
 }
 
-/* ANCIENT HORROR TEXT */
+/* GOTHIC TEXT */
 
 .message {
     position: absolute;
     z-index: 6;
     inset: 0;
+
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
+
     text-align: center;
-    padding: 160px 18px 100px;
+    padding: 155px 18px 95px;
 }
 
 #warning {
     font-family: "UnifrakturCook", "MedievalSharp", serif;
-    font-size: clamp(39px, 7.5vw, 94px);
-    color: #ff1b38;
+    font-size: clamp(39px, 7.3vw, 94px);
+    color: #ff203d;
+    line-height: 1.15;
     max-width: 1000px;
     min-height: 1.4em;
-    line-height: 1.15;
+
     text-shadow:
-        0 0 12px #ff163b,
-        0 0 35px #ad001b,
-        0 0 65px #650008;
+        0 0 12px #ff193a,
+        0 0 36px #ad0019,
+        0 0 68px #640007;
 }
 
 #subtext {
     font-family: "MedievalSharp", serif;
-    color: #e6a6ae;
     font-size: clamp(15px, 2.5vw, 26px);
+    color: #e9a6b0;
     letter-spacing: 2px;
-    margin-top: 20px;
+    margin-top: 24px;
     min-height: 2em;
     text-shadow: 0 0 18px #a0001a;
 }
 
-#offlineMessage {
-    display: none;
-    margin-top: 30px;
-    color: #ff6a79;
-    font-family: "MedievalSharp", serif;
-    font-size: 20px;
-}
-
-/* COUNTER */
+/* SMALL COUNTER */
 
 .counter {
     position: absolute;
     z-index: 10;
-    right: 15px;
-    bottom: 15px;
-    font-size: 11px;
-    color: #b9848a;
-    background: #12000499;
-    padding: 9px 12px;
-    border: 1px solid #6f1121;
-    border-radius: 9px;
+    right: 14px;
+    bottom: 14px;
+
+    color: #d7a0a8;
+    background: #150004bb;
+    border: 1px solid #6e0b1c;
+    border-radius: 10px;
+
+    padding: 11px 14px;
+    font-size: 12px;
+    line-height: 1.8;
 }
 
-.counter b { color: #ff6074; }
+.counter b {
+    color: #ff6476;
+    font-variant-numeric: tabular-nums;
+}
 
-@media(max-width:700px) {
+@media (max-width: 700px) {
     .cards { grid-template-columns: 1fr; }
     .m1 { width: 48vw; }
     .m2 { width: 28vw; left: 4%; }
@@ -368,7 +383,7 @@ footer {
     .m5 { width: 35vw; }
 }
 
-@media(prefers-reduced-motion:reduce) {
+@media (prefers-reduced-motion: reduce) {
     .drip, .fog { animation: none; }
 }
 </style>
@@ -388,15 +403,18 @@ footer {
 
 <main>
     <h2>Featured Stories</h2>
+
     <div class="cards">
         <article>
             <h3>Small Things, Big Changes</h3>
             <p>Simple habits that transform everyday life.</p>
         </article>
+
         <article>
             <h3>Living With Technology</h3>
             <p>Finding balance in a connected world.</p>
         </article>
+
         <article>
             <h3>Making Room for Creativity</h3>
             <p>Discover inspiration in ordinary moments.</p>
@@ -406,12 +424,15 @@ footer {
 
 <footer>
     © The Daily Edit
-    <div id="normalCount">
-        HTTP requests served: <span id="actual">0</span>
+
+    <div class="normal-counter">
+        Actual HTTP requests:
+        <span id="actual">0</span>
     </div>
 </footer>
 
 <div id="horror">
+
     <div class="blood-top">
         <i class="drip d1"></i>
         <i class="drip d2"></i>
@@ -434,34 +455,37 @@ footer {
     <div class="message">
         <div id="warning"></div>
         <div id="subtext"></div>
-        <div id="offlineMessage">
-            THE CONNECTION HAS BEEN SEVERED
-        </div>
     </div>
 
     <div class="counter">
-        HTTP requests served: <b id="hActual">0</b>
+        Simulated requests: <b id="visual">0</b><br>
+        Power: 2^<b id="step">0</b><br>
+        Actual HTTP requests: <b id="hActual">0</b>
     </div>
+
 </div>
 
 <script>
 let active = false;
-let failures = 0;
 let timers = [];
+let transitioning = false;
 
-function typeLine(id, text, speed, delay) {
+function typeLine(id, message, speed, delay) {
     const el = document.getElementById(id);
     el.textContent = "";
 
-    for (let i = 1; i <= text.length; i++) {
-        timers.push(setTimeout(() => {
-            el.textContent = text.slice(0, i);
-        }, delay + i * speed));
+    for (let i = 1; i <= message.length; i++) {
+        const timer = setTimeout(() => {
+            el.textContent = message.slice(0, i);
+        }, delay + i * speed);
+
+        timers.push(timer);
     }
 }
 
-function startHorror() {
+function horrorOn() {
     if (active) return;
+
     active = true;
 
     document.getElementById("horror")
@@ -470,40 +494,50 @@ function startHorror() {
     typeLine(
         "warning",
         "YOU SHOULD NOT HAVE COME HERE",
-        145,
+        95,
         0
     );
 
     typeLine(
         "subtext",
         "IT SEES YOU. IT KNOWS YOU ARE HERE.",
-        100,
-        5300
+        70,
+        3400
     );
 }
 
-function stopHorror() {
+function horrorOff() {
     if (!active) return;
+
     active = false;
+
     timers.forEach(clearTimeout);
     timers = [];
+
     document.getElementById("horror")
         .classList.remove("active");
-    document.getElementById("offlineMessage")
-        .style.display = "none";
 }
 
 async function poll() {
+    if (transitioning) return;
+
     try {
         const response = await fetch(
             "/api/status?t=" + Date.now(),
             { cache: "no-store" }
         );
 
-        if (!response.ok) throw Error("Request failed");
+        if (response.status === 503) {
+            transitioning = true;
+            window.location.replace(
+                "/?offline=" + Date.now()
+            );
+            return;
+        }
+
+        if (!response.ok) return;
 
         const data = await response.json();
-        failures = 0;
 
         document.getElementById("actual")
             .textContent = data.actual.toLocaleString();
@@ -511,59 +545,112 @@ async function poll() {
         document.getElementById("hActual")
             .textContent = data.actual.toLocaleString();
 
-        if (data.phase !== "online") {
-            startHorror();
-        } else {
-            stopHorror();
-        }
+        document.getElementById("visual")
+            .textContent = data.visual.toLocaleString();
 
-        document.getElementById("offlineMessage")
-            .style.display = "none";
+        document.getElementById("step")
+            .textContent = data.step;
+
+        if (data.phase === "running") {
+            horrorOn();
+        } else {
+            horrorOff();
+        }
 
     } catch (e) {
-        failures++;
-
-        // Do not mistake a single network error
-        // for a confirmed hosting suspension.
-        if (active && failures >= 3) {
-            document.getElementById("offlineMessage")
-                .style.display = "block";
-        }
+        console.error("Status unavailable", e);
     }
 }
 
-setInterval(poll, 1000);
+setInterval(poll, 500);
 poll();
 </script>
 </body>
 </html>
 """
 
+ERROR_PAGE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>503 Service Unavailable</title>
+<style>
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: #111;
+    color: white;
+    font-family: Arial, sans-serif;
+    display: grid;
+    place-items: center;
+    text-align: center;
+}
+main {
+    padding: 30px;
+    max-width: 700px;
+}
+h1 {
+    font-size: clamp(36px, 7vw, 70px);
+    margin-bottom: 12px;
+}
+p {
+    color: #ccc;
+    font-size: 18px;
+    line-height: 1.6;
+}
+small { color: #aaa; }
+</style>
+</head>
+<body>
+<main>
+    <h1>503 Service Unavailable</h1>
+    <p>The server is temporarily unable to handle this request.</p>
+    <small>HTTP ERROR 503</small>
+</main>
+</body>
+</html>
+"""
 
-def get_state():
+
+def current_state():
     with lock:
         start = started_at
-        seconds = duration
-        count = request_count
+        selected = power
+        interval = step_seconds
+        actual = request_count
 
     if start is None:
-        return "online", count
+        return "online", 0, 0, actual
 
     elapsed = time.monotonic() - start
-    phase = "complete" if elapsed >= seconds else "running"
-    return phase, count
+
+    # Each step doubles the displayed load.
+    # The interval is long enough for the horror
+    # text animation to finish, even at Power 4.
+    step = min(selected, int(elapsed / interval) + 1)
+    visual = 2 ** step
+
+    if elapsed >= selected * interval:
+        phase = "complete"
+    else:
+        phase = "running"
+
+    return phase, step, visual, actual
 
 
 def authorized():
-    supplied = request.headers.get("X-Control-Key", "")
+    entered = request.headers.get("X-Control-Key", "")
+
     return (
         bool(CONTROL_PASSWORD)
-        and secrets.compare_digest(supplied, CONTROL_PASSWORD)
+        and secrets.compare_digest(entered, CONTROL_PASSWORD)
     )
 
 
 @app.before_request
-def count_request():
+def count_http_request():
     global request_count
 
     with lock:
@@ -571,43 +658,62 @@ def count_request():
 
 
 @app.after_request
-def disable_cache(response):
+def no_cache(response):
     response.headers["Cache-Control"] = "no-store"
     return response
 
 
 @app.get("/")
 def home():
-    return PAGE
+    phase, _, _, _ = current_state()
+
+    if phase == "complete":
+        return ERROR_PAGE, 503
+
+    return PAGE, 200
 
 
 @app.get("/api/status")
 def status():
-    phase, count = get_state()
+    phase, step, visual, actual = current_state()
+
     return jsonify(
         phase=phase,
-        actual=count
-    )
+        step=step,
+        visual=visual,
+        actual=actual,
+        power=power
+    ), (503 if phase == "complete" else 200)
 
 
 @app.post("/api/start")
 def start():
-    global started_at, duration
+    global started_at, power, step_seconds
 
     if not authorized():
         return jsonify(error="Unauthorized"), 401
 
     data = request.get_json(silent=True) or {}
-    seconds = data.get("seconds")
+    selected = data.get("power")
 
-    if type(seconds) is not int or seconds not in (18, 25):
-        return jsonify(error="Choose 18 or 25 seconds"), 400
+    if type(selected) is not int or not (4 <= selected <= 20):
+        return jsonify(error="Choose Power 4 through 20"), 400
+
+    # Never send 2^n real requests.
+    # n only controls the displayed value.
+    interval = max(0.7, 8.0 / selected)
 
     with lock:
+        power = selected
+        step_seconds = interval
         started_at = time.monotonic()
-        duration = seconds
 
-    return jsonify(message="Started")
+    return jsonify(
+        message="Started",
+        power=selected,
+        max_visual=2 ** selected,
+        step_seconds=interval
+    )
 
 
 @app.post("/api/reset")
