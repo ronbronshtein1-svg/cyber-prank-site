@@ -15,12 +15,7 @@ duration = 18
 request_count = 0
 
 IMAGE_NAMES = [
-    "monster.png",
-    "monster.jpg",
-    "monster.jpeg",
-    "creepy.png",
-    "creepy.jpg",
-    "creepy.jpeg"
+    "creepy-removebg-preview.png"
 ]
 
 
@@ -430,11 +425,11 @@ footer {
 
     <div class="fog"></div>
 
-    <img class="monster m1" src="/monster" alt="">
-    <img class="monster m2" src="/monster" alt="">
-    <img class="monster m3" src="/monster" alt="">
-    <img class="monster m4" src="/monster" alt="">
-    <img class="monster m5" src="/monster" alt="">
+    <img class="monster m1" src="/static/creepy-removebg-preview.png" alt="">
+    <img class="monster m2" src="/static/creepy-removebg-preview.png" alt="">
+    <img class="monster m3" src="/static/creepy-removebg-preview.png" alt="">
+    <img class="monster m4" src="/static/creepy-removebg-preview.png" alt="">
+    <img class="monster m5" src="/static/creepy-removebg-preview.png" alt="">
 
     <div class="message">
         <div id="warning"></div>
