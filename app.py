@@ -656,8 +656,8 @@ function horrorOn() {
     active = true;
     document.getElementById('horror').classList.add('on');
 
-    typeLine('warning', "YOU'VE BEEN HACKED", 135, 0);
-    typeLine('subtext', "AN ANCIENT CURSE HAS AWAKENED", 62, 2800);
+    typeLine('warning', "YOU SHOULD NOT HAVE COME HERE", 175, 0);
+    typeLine('subtext', "IT SEES YOU. IT KNOWS YOU ARE HERE.", 110, 6200);
 }
 
 function horrorOff() {
